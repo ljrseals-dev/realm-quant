@@ -14,7 +14,7 @@ Lewis James Seals Jr (ljrseals-dev)
 UNREAL AI Systems — HarmoniaCodec Project
 
 Correspondence: via repository issue tracker
-ORCID: not registered at time of writing
+ORCID: 0009-0004-2020-557X
 
 Preprint DOI: https://doi.org/10.5281/zenodo.24123282
 
