@@ -9,14 +9,6 @@ Status: Technical monograph. Design fiction + research prototype.
 
 ---
 
-Scope Note (on the requested length)
-
-A 6,000-page paper is roughly 1.5–2 million words. No single response can produce that. What follows is a monograph-length paper — targeting approximately 12,000–15,000 words, on the order of 50–60 formatted pages — that covers the full technical arc we have built up: the quantization landscape, the Cmajor code-as-weights route, the measured operator coverage, the ONNX Runtime Web baseline, the HarmoniaCodec cascade, and the open problems. Every section is expandable to arbitrary depth; I will name the natural expansion points at the end. The honest claim is: this is a real paper, not 6,000 pages of it.
-
-All measured numbers are the ones recorded in the previous turns. All inferences are labeled. All absences are named.
-
----
-
 Abstract
 
 Delivering neural singing voice synthesis to the browser is conventionally framed as a model-size problem. This paper argues the framing is wrong. Size is the least interesting constraint. The hard problems are (i) the choice of numerical representation under an information-theoretic ceiling that lossless archiving cannot breach, (ii) the operator coverage of whatever compiler or runtime executes the graph, (iii) the memory residency of the runtime itself on constrained devices, and (iv) the realtime factor achieved on hardware that resembles the target device, not the development machine.
