@@ -15,7 +15,7 @@ UNREAL AI Systems — HarmoniaCodec Project
 
 Correspondence: via repository issue tracker
 ORCID: not registered at time of writing
-Preprint DOI: none assigned
+Preprint DOI: https://doi.org/10.5281/zenodo.24123282
 
 ---
 
