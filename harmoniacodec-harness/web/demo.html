@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Realm of Quant — Live Ring</title>
+<style>
+  /* ── theme ─────────────────────────────────────────────────────────── */
+  :root {
+    --fg:       #d4e0ee;
+    --bg:       #060910;
+    --panel:    #0c121a;
+    --border:   #263140;
+    --muted:    #6a7a8e;
+    --subtle:   #8a9aae;
+    --hue-pos:  190;   /* + terminal: teal-blue */
+    --hue-neg:  20;    /* − terminal: amber     */
+    --charge:   0deg;  /* set by JS */
+  }
+
+  /* ── page ──────────────────────────────────────────────────────────── */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    background: radial-gradient(circle at 50% 28%, #10161f, var(--bg) 72%);
+    color: var(--fg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 3rem;
+    line-height: 1.5;
+  }
+
+  header { text-align: center; max-width: 680px; }
+  .kicker {
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+  h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-weight: 500;
+    font-size: clamp(22px, 3.4vw, 34px);
+    margin: 0 0 0.4rem;
+    color: #f2f6fb;
+    letter-spacing: 0.01em;
+  }
+  .byline { font-size: 12px; color: var(--subtle); margin: 0; }
+  .sub    { font-size: 11px; color: var(--muted);   margin: 0.5rem 0 0; }
+
+  main {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.6rem;
+    margin-top: 2rem;
+  }
+
+  /* ── the ring (the battery) ────────────────────────────────────────── */
+  .stage {
+    --ring:   min(76vmin, 580px);
+    --radius: calc(var(--ring) * 0.36);
+    --cell-w: calc(var(--ring) * 0.21);
+    --cell-h: calc(var(--ring) * 0.10);
+    position: relative;
+    width: var(--ring);
+    height: var(--ring);
+  }
+  .ring { position: absolute; inset: 0; }
+
+  /* guide rail inside the cell ring */
+  .track {
+    position: absolute;
+    inset: calc(var(--ring) * 0.214);
+    border-radius: 50%;
+    border: 1px dashed hsla(200, 30%, 55%, 0.18);
+  }
+
+  /* a cell: rounded body + right-facing terminal nub */
+  .cell {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width:  var(--cell-w);
+    height: var(--cell-h);
+    margin-left: calc(var(--cell-w) * -0.5);
+    margin-top:  calc(var(--cell-h) * -0.5);
+    transform:
+      rotate(calc(var(--i) * 60deg))
+      translateY(calc(-1 * var(--radius)))
+      rotate(calc(var(--i) * -60deg));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: linear-gradient(180deg, #182030, #0c121a);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-family: inherit;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    transition:
+      box-shadow  0.3s ease,
+      filter      0.3s ease,
+      border-color 0.3s ease,
+      color       0.3s ease;
+  }
+  .cell::after {
+    content: '';
+    position: absolute;
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 5px;
+    height: 35%;
+    background: currentColor;
+    border-radius: 0 2px 2px 0;
+    opacity: 0.4;
+  }
+  .cell[data-pol="+"] {
+    border-color: hsla(var(--hue-pos), 70%, 55%, 0.35);
+    color: hsl(var(--hue-pos), 70%, 65%);
+  }
+  .cell[data-pol="-"] {
+    border-color: hsla(var(--hue-neg), 70%, 55%, 0.35);
+    color: hsl(var(--hue-neg), 70%, 65%);
+  }
+  .cell .glyph {
+    font-size: 14px;
+    line-height: 1;
+    font-weight: 700;
+  }
+  .cell .label {
+    font-size: 8px;
+    opacity: 0.72;
+  }
+  .cell[data-done="true"] {
+    filter: brightness(0.65) saturate(0.7);
+  }
+  .cell[data-active="true"] {
+    filter: brightness(1.4) saturate(1.15);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% {
+      box-shadow:
+        0 0 24px currentColor,
+        0 0 48px hsla(var(--hue-pos), 90%, 60%, 0.15),
+        inset 0 0 12px hsla(0,0%,100%,0.06);
+    }
+    50% {
+      box-shadow:
+        0 0 36px currentColor,
+        0 0 72px hsla(var(--hue-pos), 90%, 60%, 0.30),
+        inset 0 0 16px hsla(0,0%,100%,0.10);
+    }
+  }
+
+  /* neutron: charge carrier, orbits the ring */
+  .neutron {
+    position: absolute;
+    inset: 0;
+    transform: rotate(var(--neutron-angle, 0deg));
+    transition: transform 0.7s cubic-bezier(0.34, 1.2, 0.64, 1);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .neutron span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 40% 35%,
+      #ffffff 0%,
+      hsl(var(--hue-pos), 90%, 60%) 55%,
+      hsl(var(--hue-pos), 90%, 40%) 100%
+    );
+    box-shadow:
+      0 0 12px hsl(var(--hue-pos), 90%, 60%),
+      0 0 24px hsla(var(--hue-pos), 90%, 60%, 0.5);
+    transform: translateY(calc(-1 * var(--radius)));
+  }
+
+  /* core: charge dial in the centre */
+  .core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width:  calc(var(--ring) * 0.28);
+    height: calc(var(--ring) * 0.28);
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: conic-gradient(
+      hsl(var(--hue-pos), 85%, 60%) 0deg var(--charge-angle, 0deg),
+      hsla(200, 30%, 40%, 0.12) var(--charge-angle, 0deg) 360deg
+    );
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    z-index: 1;
+  }
+  .core::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--panel) 40%, var(--bg) 100%);
+    border: 1px solid hsla(200, 30%, 55%, 0.10);
+  }
+  .core > * { position: relative; z-index: 2; }
+  .core-value {
+    font-size: calc(var(--ring) * 0.045);
+    color: #f2f6fb;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+  .core-label {
+    font-size: calc(var(--ring) * 0.018);
+    letter-spacing: 0.25em;
+    color: var(--muted);
+  }
+
+  /* ── controls ──────────────────────────────────────────────────────── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 0.7rem 1.5rem;
+    background: linear-gradient(
+      180deg,
+      hsl(var(--hue-pos), 70%, 55%),
+      hsl(var(--hue-pos), 70%, 45%)
+    );
+    color: var(--bg);
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    box-shadow: 0 4px 16px hsla(var(--hue-pos), 90%, 50%, 0.30);
+    transition: transform 0.1s, box-shadow 0.2s, filter 0.2s;
+  }
+  button:hover  { filter: brightness(1.1); }
+  button:active { transform: translateY(1px); }
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+  }
+  #note {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* ── log ───────────────────────────────────────────────────────────── */
+  #log {
+    width: 100%;
+    font-size: 11px;
+    color: var(--subtle);
+    background: rgba(12, 18, 26, 0.6);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    margin: 0;
+    min-height: 4rem;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.55;
+  }
+
+  footer {
+    max-width: 660px;
+    text-align: center;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    margin-top: 1rem;
+  }
+  footer code {
+    color: var(--subtle);
+    font-size: 10px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="kicker">UNREAL AI SYSTEMS · HARMONIACODEC</div>
+  <h1>Realm of Quant — Live Ring</h1>
+  <p class="byline">ljrseals-dev · Lewis James Seals Jr · 10 Nov 2026</p>
+  <p class="sub">fp16 descript DAC 24 kHz decoder · ONNX Runtime Web · WASM · single thread</p>
+</header>
+
+<main>
+  <section class="stage" aria-label="battery ring: six-stage neural audio pipeline">
+    <div class="ring" id="ring" style="--neutron-angle:0deg; --charge-angle:0deg;">
+      <div class="track"></div>
+
+      <div class="neutron"><span></span></div>
+
+      <div class="core">
+        <div class="core-value" id="core-value">0%</div>
+        <div class="core-label">CHARGE</div>
+      </div>
+
+      <div class="cell" style="--i:0" data-pol="+" data-active="false" data-done="false">
+        <span class="glyph">+</span><span class="label">FETCH</span>
+      </div>
+      <div class="cell" style="--i:1" data-pol="−" data-active="false" data-done="false">
+        <span class="glyph">−</span><span class="label">LOAD</span>
+      </div>
+      <div class="cell" style="--i:2" data-pol="+" data-active="false" data-done="false">
+        <span class="glyph">+</span><span class="label">DECODE</span>
+      </div>
+      <div class="cell" style="--i:3" data-pol="−" data-active="false" data-done="false">
+        <span class="glyph">−</span><span class="label">PCM</span>
+      </div>
+      <div class="cell" style="--i:4" data-pol="+" data-active="false" data-done="false">
+        <span class="glyph">+</span><span class="label">PLAY</span>
+      </div>
+      <div class="cell" style="--i:5" data-pol="−" data-active="false" data-done="false">
+        <span class="glyph">−</span><span class="label">RING</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="controls">
+    <button id="go">Run the ring</button>
+    <span id="note">idle · decoder not loaded</span>
+  </section>
+
+  <pre id="log" aria-live="polite"></pre>
+
+  <footer>
+    <p>
+      Offline-render demo. The decoder runs at <code>RTF ≈ 3.16</code> on the reference
+      hardware — slower than realtime. Not a song. It proves the FP16 decoder
+      executes in a browser tab and produces audible PCM through
+      <code>AudioContext</code>. The ring is pure CSS: six cells with alternating
+      <code>+ − + − + −</code> terminals, a neutron orbiting on
+      <code>--neutron-angle</code>, a charge dial on <code>--charge-angle</code>.
+    </p>
+  </footer>
+</main>
+
+<script type="module">
+import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.mjs';
+
+/* ── config ──────────────────────────────────────────────────────────── */
+const MODEL_URLS = [
+  'https://huggingface.co/onnx-community/dac_24khz-ONNX/resolve/main/onnx/decoder_model_fp16.onnx',
+  'https://huggingface.co/onnx-community/dac_24khz-ONNX/resolve/main/onnx/decoder_model.onnx',
+];
+const SAMPLE_RATE   = 24000;
+const HOP           = 320;
+const CHUNK_FRAMES  = 32;
+const TOTAL_FRAMES  = 128;   // 4 chunks → ≈1.71 s of audio
+
+/* ── runtime flags ───────────────────────────────────────────────────── */
+ort.env.wasm.wasmPaths  = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
+ort.env.wasm.numThreads = 1;
+ort.env.wasm.simd       = true;
+
+/* ── elements ────────────────────────────────────────────────────────── */
+const ringEl    = document.getElementById('ring');
+const coreValue = document.getElementById('core-value');
+const note      = document.getElementById('note');
+const logEl     = document.getElementById('log');
+const goBtn     = document.getElementById('go');
+
+/* ── logging ─────────────────────────────────────────────────────────── */
+const t0 = performance.now();
+function log(msg) {
+  const dt = ((performance.now() - t0) / 1000).toFixed(2);
+  logEl.textContent += `[${dt}s] ${msg}\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+/* ── stage + charge drivers (CSS custom properties) ──────────────────── */
+function setStage(idx, label) {
+  document.querySelectorAll('.cell').forEach((el, i) => {
+    el.dataset.active = (i === idx) ? 'true' : 'false';
+    el.dataset.done   = (idx > i)   ? 'true' : 'false';
+  });
+  const angle = idx < 0 ? 0 : idx * 60;
+  ringEl.style.setProperty('--neutron-angle', angle + 'deg');
+  if (typeof label === 'string') note.textContent = label;
+}
+function setCharge(pct) {
+  const c = Math.max(0, Math.min(100, pct));
+  ringEl.style.setProperty('--charge-angle', (c * 3.6) + 'deg');
+  coreValue.textContent = Math.round(c) + '%';
+}
+
+/* ── model fetch with progress + fallback ────────────────────────────── */
+async function fetchWithProgress(url, onProgress) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const total = Number(resp.headers.get('content-length')) || 0;
+  const reader = resp.body.getReader();
+  const chunks = [];
+  let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    if (total) onProgress(received / total);
+  }
+  const bytes = new Uint8Array(received);
+  let off = 0;
+  for (const c of chunks) { bytes.set(c, off); off += c.length; }
+  return bytes;
+}
+async function fetchModel() {
+  for (const url of MODEL_URLS) {
+    try {
+      log('try ' + url);
+      const bytes = await fetchWithProgress(url, f => {
+        setCharge(f * 35);
+        note.textContent = `fetching ${(f * 100).toFixed(0)}%`;
+      });
+      log(`fetched ${(bytes.byteLength / 1e6).toFixed(1)} MB`);
+      return bytes;
+    } catch (e) {
+      log('  miss: ' + e.message);
+    }
+  }
+  throw new Error('no model URL succeeded');
+}
+
+/* ── deterministic code stream ───────────────────────────────────────── */
+function makeCodes(frames) {
+  let s = 0xC0DE;
+  const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 0x100000000;
+  const codes = new BigInt64Array(frames * 32);
+  for (let i = 0; i < codes.length; i++) {
+    codes[i] = BigInt(Math.floor(rnd() * 1024));
+  }
+  return codes;
+}
+
+/* ── chunked decode with 8-sample-seam trim ──────────────────────────── */
+async function decodeChunks(sess, codes, chunkFrames) {
+  const totalFrames = codes.length / 32;
+  const nChunks = Math.ceil(totalFrames / chunkFrames);
+  const pieces = [];
+  for (let c = 0; c < nChunks; c++) {
+    const start = c * chunkFrames;
+    const end   = Math.min(start + chunkFrames, totalFrames);
+    const frames = end - start;
+
+    // one extra frame of lookahead so ConvTranspose has context
+    const padded = new BigInt64Array((frames + 1) * 32);
+    for (let f = 0; f < frames; f++) {
+      for (let k = 0; k < 32; k++) {
+        padded[f * 32 + k] = codes[(start + f) * 32 + k];
+      }
+    }
+    for (let k = 0; k < 32; k++) {
+      padded[frames * 32 + k] = codes[(end - 1) * 32 + k];
+    }
+
+    const input = new ort.Tensor('int64', padded, [1, 32, frames + 1]);
+    const out   = await sess.run({ audio_codes: input });
+    const data  = out[Object.keys(out)[0]].data;
+
+    // trim: drop the extra context frame AND the 8-sample transposed-conv seam
+    pieces.push(data.slice(0, frames * HOP));
+  }
+  const total = pieces.reduce((a, p) => a + p.length, 0);
+  const merged = new Float32Array(total);
+  let off = 0;
+  for (const p of pieces) { merged.set(p, off); off += p.length; }
+  return merged;
+}
+
+/* ── playback ────────────────────────────────────────────────────────── */
+async function playPCM(pcm) {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx({ sampleRate: SAMPLE_RATE });
+  await ctx.resume();
+  const buf = ctx.createBuffer(1, pcm.length, SAMPLE_RATE);
+  buf.copyToChannel(pcm, 0);
+  const src  = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  src.buffer = buf;
+  gain.gain.value = 0.6;
+  src.connect(gain).connect(ctx.destination);
+  return new Promise(resolve => {
+    src.onended = () => { try { ctx.close(); } catch {} resolve(); };
+    src.start();
+  });
+}
+
+/* ── the run loop ────────────────────────────────────────────────────── */
+async function run() {
+  goBtn.disabled = true;
+  logEl.textContent = '';
+  setCharge(0);
+  setStage(0, 'fetching fp16 decoder…');
+
+  try {
+    // 0 · FETCH  (+)
+    const bytes = await fetchModel();
+    setCharge(35);
+
+    // 1 · LOAD  (−)
+    setStage(1, 'creating inference session…');
+    const tLoad = performance.now();
+    const session = await ort.InferenceSession.create(bytes, {
+      executionProviders: ['wasm'],
+      graphOptimizationLevel: 'all',
+    });
+    log(`session ready in ${(performance.now() - tLoad).toFixed(0)} ms`);
+    setCharge(55);
+
+    // 2 · DECODE  (+)
+    setStage(2, `decoding ${TOTAL_FRAMES} code frames…`);
+    const codes = makeCodes(TOTAL_FRAMES);
+    const tDec = performance.now();
+    const pcm = await decodeChunks(session, codes, CHUNK_FRAMES);
+    const decMs = performance.now() - tDec;
+    const audioSec = pcm.length / SAMPLE_RATE;
+    const rtf = (decMs / 1000) / audioSec;
+    log(`decoded ${pcm.length} samples in ${decMs.toFixed(0)} ms · RTF ${rtf.toFixed(2)}`);
+    setCharge(75);
+
+    // 3 · PCM  (−)
+    setStage(3, `pcm buffer ${pcm.length} samples @ ${SAMPLE_RATE} Hz`);
+    await new Promise(r => setTimeout(r, 150));
+    setCharge(85);
+
+    // 4 · PLAY  (+)
+    setStage(4, 'playing through AudioContext…');
+    log('playback start');
+    await playPCM(pcm);
+    log('playback end');
+    setCharge(95);
+
+    // 5 · RING  (−) — closed loop, neutron returns to start
+    setStage(5, 'ring closes — neutron returns to FETCH');
+    await new Promise(r => setTimeout(r, 700));
+    setCharge(100);
+    await new Promise(r => setTimeout(r, 400));
+
+    setStage(-1, 'done · re-run to repeat');
+  } catch (e) {
+    log('ERROR ' + e.message);
+    note.textContent = 'error: ' + e.message;
+    setStage(-1, 'error · see log');
+  } finally {
+    goBtn.disabled = false;
+  }
+}
+
+goBtn.addEventListener('click', run);
+log('demo ready · six-stage ring · fp16 decoder');
+log('caveat: offline-render demo, not realtime · RTF ≈ 3.16 on reference hardware');
+</script>
+</body>
+  </html>
