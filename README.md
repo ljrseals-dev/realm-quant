@@ -194,3 +194,82 @@ Seals, Jr., L. J. (2026). Realm of Quant: Cmajor Gigs to Browser — Weight Repr
 Editorial note
 
 This document is a technical report posted without peer review. It contains measured results on publicly available artifacts and source-level readings of publicly available code. It does not contain a trained model, a perceptual evaluation, or a mobile measurement. Readers should treat the reported realtime factors as hardware-specific and the reported operator coverage as artifact-specific. The load-bearing unverified claim — architectural transfer to the singing fine-tune — is stated as such in Limitations and in the full manuscript.
+
+
+## Weights reference and browser demos
+
+The browser harness references the public MIT descript DAC 24 kHz ONNX exports from
+[onnx-community/dac_24khz-ONNX](https://huggingface.co/onnx-community/dac_24khz-ONNX).
+The demos pin an immutable upstream revision rather than resolving a moving
+`main` branch:
+
+`4b180296388b0cebdca8191db999e87b03cd7a95`
+
+| Demo | Path | Pipeline | Runtime |
+|---|---|---|---|
+| Decoder-only | [`harmoniacodec-harness/web/demo.html`](harmoniacodec-harness/web/demo.html) | 32×N codes → PCM | ONNX Runtime Web · WASM single-thread |
+| Round-trip | [`harmoniacodec-harness/web/encoder_demo.html`](harmoniacodec-harness/web/encoder_demo.html) | audio → 32×N codes → PCM | ONNX Runtime Web · WASM single-thread |
+
+### Pinned FP16 artifacts
+
+| Artifact | Immutable file reference | Bytes | SHA-256 (Hugging Face LFS) |
+|---|---|---:|---|
+| Decoder | [`onnx/decoder_model_fp16.onnx`](https://huggingface.co/onnx-community/dac_24khz-ONNX/blob/4b180296388b0cebdca8191db999e87b03cd7a95/onnx/decoder_model_fp16.onnx) | 105,885,847 | `adf016cf402816d0639fe3cd791580f85e48980259a6f3e3c4993c5a2d661ff8` |
+| Encoder | [`onnx/encoder_model_fp16.onnx`](https://huggingface.co/onnx-community/dac_24khz-ONNX/blob/4b180296388b0cebdca8191db999e87b03cd7a95/onnx/encoder_model_fp16.onnx) | 45,648,774 | `7f985f37236fa5ef581285bd9644f372c06e74bd4767cfb524ee94558228343d` |
+
+The byte counts and digests above are taken from the upstream Hugging Face
+Git-LFS pointers at the pinned revision. The demos use those expected digests:
+a mismatch purges the corresponding Cache Storage entry and blocks session
+initialization. A byte-count match alone is only a plausibility check, never
+an integrity claim. There is no FP32 fallback; an unavailable pinned FP16 file
+is a named hard failure.
+
+### What the browser UI reports
+
+The UI exposes four distinct phases: **Download** (per-artifact streaming
+progress, aggregate progress, cache HIT/MISS, digest state), **Init** (ORT
+session creation), **Render** (offline audio-seconds progress, measured RTF and
+ETA), and **Playback** (AudioContext playback of the completed offline result).
+The render indicator is explicitly labelled **offline — not realtime**; it is
+not a playback buffer or streaming position. WebGPU remains **unmeasured**.
+Memory readings unavailable from the browser are reported as **unmeasured**.
+
+Artifact states are not interchangeable:
+
+- **downloadable** — bytes were received from the pinned URL;
+- **verified** — the locally computed SHA-256 matches the expected digest
+  published in the pinned upstream Git-LFS pointer;
+- **executed** — an ONNX Runtime session was created and inference completed.
+  This final state is only established by a successful run, not by download
+  or digest verification alone.
+
+### Engineering flow
+
+```mermaid
+flowchart TD
+  A[Download pinned FP16 files] --> B[Cache HIT or MISS]
+  B --> C[Compute SHA-256]
+  C --> D{Matches pinned LFS digest?}
+  D -- no --> E[Purge cache and stop]
+  D -- yes --> F[Initialize ONNX Runtime WASM]
+  F --> G[Offline render]
+  G --> H[Completed PCM]
+  H --> I[AudioContext playback]
+```
+
+### Performance boundary
+
+The reference report measured decoder RTF ≈ 3.16 and encoder RTF ≈ 1.43 on a
+2-vCPU Xeon using single-thread WASM. Neither is faster than realtime. The
+combined concurrent residency measurement was approximately 823 MB. No phone
+was tested, WebGPU was not measured, and the singing fine-tune checkpoint was
+unavailable. These demos therefore document browser execution and offline
+rendering; they do not establish realtime performance or mobile viability.
+
+### Attribution
+
+The weights-integration innovation required to make the released model weights
+work with this pipeline is credited to **Angela Seals**. The project author
+retains the report and benchmark-harness authorship stated above. This
+contribution credit is also recorded in [`CITATION.cff`](CITATION.cff) and
+the [provenance ledger header](provenance/ledger-header.json).
