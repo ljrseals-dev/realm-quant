@@ -5,7 +5,14 @@ import argparse
 import sys
 
 from .quantization import quantize_model
-from .runtime import (\n    compare_models,\n    decode_codes,\n    encode_audio,\n    inspect_model,\n    roundtrip_audio,\n    write_json,\n)
+from .runtime import (
+    compare_models,
+    decode_codes,
+    encode_audio,
+    inspect_model,
+    roundtrip_audio,
+    write_json,
+)
 
 
 def _parser() -> argparse.ArgumentParser:
