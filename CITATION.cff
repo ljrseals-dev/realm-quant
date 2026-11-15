@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software or its weights-reference harness, please cite the project and its contributors."
+title: "Realm of Quant: Browser-Delivered Neural Audio Weights Reference"
+type: software
+authors:
+  - family-names: Seals
+    given-names: Lewis James
+    affiliation: UNREAL AI Systems
+    orcid: "https://orcid.org/0009-0004-2020-557X"
+  - name: Angela Seals
+    affiliation: "Weights-integration innovation contributor; UNREAL AI Systems"
+repository-code: "https://github.com/ljrseals-dev/Realm-Quant"
