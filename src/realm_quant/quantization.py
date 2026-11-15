@@ -42,19 +42,23 @@ def unpack_2bit(packed: np.ndarray, count: int) -> np.ndarray:
     return out[:count]
 
 
-def _ternarize(array: np.ndarray, threshold_ratio: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return symbol codes, per-output-channel scales, and reconstructed weights."""
+def _ternarize(
+    array: np.ndarray,
+    threshold_ratio: float,
+    axis: int = 0,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return symbols, per-output-channel scales, and reconstructed weights."""
     weights = np.asarray(array, dtype=np.float32)
     if weights.ndim < 2:
         raise ValueError("ternary weight tensors must have rank >= 2")
     if not np.isfinite(weights).all():
         raise ValueError("weight tensor contains NaN or infinity")
-
-    rows = weights.reshape(weights.shape[0], -1)
+    axis = np.core.numeric.normalize_axis_index(axis, weights.ndim)
+    moved = np.moveaxis(weights, axis, 0)
+    rows = moved.reshape(moved.shape[0], -1)
     magnitudes = np.abs(rows)
     thresholds = magnitudes.mean(axis=1, keepdims=True) * threshold_ratio
-    active = magnitudes >= thresholds
-    active &= magnitudes > 0
+    active = (magnitudes >= thresholds) & (magnitudes > 0)
     counts = active.sum(axis=1, keepdims=True)
     scales = np.divide(
         (magnitudes * active).sum(axis=1, keepdims=True),
@@ -66,8 +70,37 @@ def _ternarize(array: np.ndarray, threshold_ratio: float) -> tuple[np.ndarray, n
     symbols[(rows > 0) & active] = 1
     symbols[(rows < 0) & active] = 2
     reconstructed = np.where(symbols == 1, scales, np.where(symbols == 2, -scales, 0.0))
-    return symbols.reshape(weights.shape), scales.reshape(-1), reconstructed.reshape(weights.shape)
+    symbols = np.moveaxis(symbols.reshape(moved.shape), 0, axis)
+    restored = np.moveaxis(reconstructed.reshape(moved.shape), 0, axis)
+    return symbols, scales.reshape(-1), restored
 
+
+def _initializer_output_axes(model: Any) -> dict[str, int]:
+    """Infer the output-channel axis from the ONNX operator consuming each weight."""
+    import onnx
+
+    axes: dict[str, int] = {}
+    for node in model.graph.node:
+        weight_index = None
+        axis = 0
+        attrs = {item.name: onnx.helper.get_attribute_value(item) for item in node.attribute}
+        if node.op_type in ("Conv", "QLinearConv"):
+            weight_index, axis = (3, 0) if node.op_type == "QLinearConv" else (1, 0)
+        elif node.op_type == "ConvTranspose":
+            weight_index, axis = 1, 1
+        elif node.op_type in ("MatMul", "MatMulInteger"):
+            weight_index, axis = 1, -1
+        elif node.op_type == "QLinearMatMul":
+            weight_index, axis = 3, -1
+        elif node.op_type == "Gemm":
+            weight_index = 1
+            axis = -2 if int(attrs.get("transB", 0)) else -1
+
+        if weight_index is not None and len(node.input) > weight_index:
+            name = node.input[weight_index]
+            if name:
+                axes.setdefault(name, axis)
+    return axes
 
 def ternary_quantize_model(
     model_path: str | Path,
@@ -98,6 +131,7 @@ def ternary_quantize_model(
         ),
         "tensors": [],
     }
+    output_axes = _initializer_output_axes(model)
     original_bytes = 0
     packed_bytes = 0
     total_values = 0
@@ -107,7 +141,8 @@ def ternary_quantize_model(
         array = numpy_helper.to_array(tensor)
         if array.dtype.kind != "f" or array.ndim < 2 or array.size < 16:
             continue
-        symbols, scales, reconstructed = _ternarize(array, threshold_ratio)
+        scale_axis = output_axes.get(tensor.name, 0)
+        symbols, scales, reconstructed = _ternarize(array, threshold_ratio, scale_axis)
         packed = pack_2bit(symbols)
         key = f"tensor_{index}"
         packed_arrays[f"{key}_symbols"] = packed
@@ -120,7 +155,7 @@ def ternary_quantize_model(
             "symbol_key": f"{key}_symbols",
             "scale_key": f"{key}_scales",
             "symbol_count": int(array.size),
-            "scale_axis": 0,
+            "scale_axis": scale_axis,
             "scale_count": int(scales.size),
             "original_dtype": str(array.dtype),
             "original_bytes": int(array.nbytes),
