@@ -372,7 +372,6 @@ const HOP          = 320;
 const CHUNK_FRAMES = 32;
 const INPUT_SEC    = 1.0;
 
-const ENCODER_URL=WEIGHTS.encoder.url, DECODER_URL=WEIGHTS.decoder.url;
 
 ort.env.wasm.wasmPaths  = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
 ort.env.wasm.numThreads = 1;
@@ -603,7 +602,7 @@ async function run(inputSource) {
     const decMs = performance.now() - tDec;
     const outSec = pcm.length / SAMPLE_RATE;
     log(`decode: ${pcm.length} samples in ${decMs.toFixed(0)} ms · RTF ${(decMs/1000/outSec).toFixed(2)}`);
-    log(`round-trip: ${inSec.toFixed(3)} s in → ${outSec.toFixed(3)} s out`);
+    log(`round-trip: ${inSec.toFixed(3)} s in → ${outSec.toFixed(3)} s out · combined RTF ${((encMs+decMs)/1000/outSec).toFixed(2)}`);
     setCharge(86);
 
     /* 4 · PLAY (+) */
