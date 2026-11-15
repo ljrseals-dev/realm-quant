@@ -53,7 +53,10 @@ def _ternarize(
         raise ValueError("ternary weight tensors must have rank >= 2")
     if not np.isfinite(weights).all():
         raise ValueError("weight tensor contains NaN or infinity")
-    axis = np.core.numeric.normalize_axis_index(axis, weights.ndim)
+    if axis < 0:
+        axis += weights.ndim
+    if not 0 <= axis < weights.ndim:
+        raise ValueError(f\"scale axis {axis} is invalid for rank {weights.ndim}\")
     moved = np.moveaxis(weights, axis, 0)
     rows = moved.reshape(moved.shape[0], -1)
     magnitudes = np.abs(rows)
