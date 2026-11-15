@@ -99,14 +99,15 @@ def _load_audio(path: str | Path, sample_rate: int = 24000) -> np.ndarray:
     mono = audio.mean(axis=1)
     if source_rate != sample_rate:
         try:
-            from scipy.signal import resample_poly
             from math import gcd
+
+            from scipy.signal import resample_poly
 
             divisor = gcd(int(source_rate), sample_rate)
             mono = resample_poly(mono, sample_rate // divisor, source_rate // divisor).astype(np.float32)
         except ImportError:
             old_x = np.arange(mono.size, dtype=np.float64) / source_rate
-            new_n = int(round(mono.size * sample_rate / source_rate))
+            new_n = round(mono.size * sample_rate / source_rate)
             new_x = np.arange(new_n, dtype=np.float64) / sample_rate
             mono = np.interp(new_x, old_x, mono).astype(np.float32)
     return np.clip(mono, -1.0, 1.0)
