@@ -12,15 +12,15 @@ from realm_quant.runtime import compare_models
 def _make_matmul_model(path: Path) -> np.ndarray:
     weights = np.array(
         [
-            [0.25, -0.5, 1.0],
-            [1.5, 0.2, -0.7],
-            [-0.4, 0.9, 0.3],
-            [0.8, -1.2, 0.6],
+            [0.25, -0.5, 1.0, 0.4],
+            [1.5, 0.2, -0.7, 0.9],
+            [-0.4, 0.9, 0.3, -1.1],
+            [0.8, -1.2, 0.6, 0.5],
         ],
         dtype=np.float32,
     )
     input_info = helper.make_tensor_value_info("features", TensorProto.FLOAT, [None, 4])
-    output_info = helper.make_tensor_value_info("scores", TensorProto.FLOAT, [None, 3])
+    output_info = helper.make_tensor_value_info("scores", TensorProto.FLOAT, [None, 4])
     weight_tensor = numpy_helper.from_array(weights, name="projection.weight")
     node = helper.make_node("MatMul", ["features", "projection.weight"], ["scores"])
     graph = helper.make_graph([node], "tiny_projection", [input_info], [output_info], [weight_tensor])
@@ -53,7 +53,7 @@ def test_ternary_model_is_executable_and_comparable(tmp_path):
     candidate_session = ort.InferenceSession(str(candidate), providers=["CPUExecutionProvider"])
     reference_output = reference_session.run(None, {"features": input_data})[0]
     candidate_output = candidate_session.run(None, {"features": input_data})[0]
-    assert reference_output.shape == candidate_output.shape == (1, 3)
+    assert reference_output.shape == candidate_output.shape == (1, 4)
     assert np.isfinite(candidate_output).all()
 
     feeds = tmp_path / "feeds.npz"
