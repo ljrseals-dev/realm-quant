@@ -295,6 +295,8 @@
     margin-top: 1rem;
   }
   footer code { color: var(--subtle); font-size: 10px; }
+
+.weights-panel{width:100%;background:#0c121a;border:1px solid #263140;border-radius:12px;padding:1rem;display:grid;gap:.8rem;font-size:11px;color:#d4e0ee}.weights-panel h2{font:600 13px ui-monospace,monospace;margin:0;color:#f2f6fb}.phase-list{display:flex;gap:.5rem;flex-wrap:wrap}.phase{padding:.35rem .55rem;border:1px solid #263140;border-radius:6px;color:#8a9aae}.phase[data-state=active]{border-color:#54c7d5;color:#9beaf0}.phase[data-state=done]{color:#9bd5ad;border-color:#365b48}.weight-row{display:grid;grid-template-columns:minmax(120px,1fr) 2fr auto;gap:.65rem;align-items:center}.weight-row progress,.render-track{width:100%;height:10px;accent-color:#54c7d5}.render-track{background:#263140;border-radius:8px;overflow:hidden}.render-fill{height:100%;width:0;background:#54c7d5;transition:width .15s}.muted{color:#8a9aae}.warning,.offline-label{font-weight:700;color:#ffc17a}.weight-meta{display:flex;justify-content:space-between;gap:.6rem;flex-wrap:wrap}@media(max-width:560px){.weight-row{grid-template-columns:1fr}.weight-row progress{grid-row:2}}
 </style>
 </head>
 <body>
@@ -339,7 +341,7 @@
     </div>
   </section>
 
-  <section class="controls">
+  <section class="weights-panel" aria-label="weight delivery and execution status"><h2>WEIGHTS REFERENCE · FP16 PINNED</h2><div class="phase-list"><span class="phase" id="phase-download" data-state="active">① Download</span><span class="phase" id="phase-init" data-state="pending">② Init</span><span class="phase" id="phase-render" data-state="pending">③ Render · offline</span><span class="phase" id="phase-play" data-state="pending">④ Playback</span></div><div id="weight-rows"></div><div class="weight-meta"><span id="weight-total">Total: pending</span><span id="cache-state">Cache: pending</span><span id="hash-state">SHA-256: pending</span></div><div class="weight-meta"><span id="claim-download">Downloadable: pending</span><span id="claim-verified">Artifact: unverified</span><span id="claim-executed">Execution: pending</span></div><div class="weight-meta"><span id="backend-state">Backend: WASM single-thread</span><span>WebGPU: unmeasured</span><span id="memory-state">Resident memory: unmeasured</span></div><div><div class="offline-label">RENDER · offline — not realtime</div><div class="render-track"><div class="render-fill" id="render-fill"></div></div><div class="weight-meta"><span id="render-meta">Rendered audio: 0.0 s</span><span id="render-eta">RTF / ETA: pending</span></div></div><div class="weight-meta"><span>Reference decoder RTF: <b>3.16</b></span><span>Encoder RTF: <b>1.43</b></span><span>Round-trip RTF: <b>≈4.59</b></span></div><div class="weight-meta warning"><span>Reference RSS: decoder 524 MB · encoder 299 MB · concurrent peak 823 MB</span><span>Desktop research harness · no phone test</span></div><div class="muted">Download, digest classification, initialization, offline rendering, and playback are distinct states. This is not a playback-buffer indicator. Reference RTF values are from the 2-vCPU Xeon single-thread WASM report; this browser run measures its own RTF.</div></section><section class="controls">
     <button id="go-tone">Round-trip: test tone</button>
     <button id="go-mic" class="secondary">Round-trip: microphone</button>
     <span id="note">idle · both sessions unloaded · ~800 MB resident when loaded</span>
@@ -358,7 +360,7 @@
       is a desktop demo. Ring is pure CSS: six cells alternating <code>+ − + − + −</code>,
       neutron on <code>--neutron-angle</code>, charge dial on <code>--charge-angle</code>.
     </p>
-  </footer>
+  <p>Weights-integration innovation credited to Angela Seals. Pinned model revision: 4b180296388b0cebdca8191db999e87b03cd7a95</p></footer>
 </main>
 
 <script type="module">
@@ -370,18 +372,30 @@ const HOP          = 320;
 const CHUNK_FRAMES = 32;
 const INPUT_SEC    = 1.0;
 
-const ENCODER_URLS = [
-  'https://huggingface.co/onnx-community/dac_24khz-ONNX/resolve/main/onnx/encoder_model_fp16.onnx',
-  'https://huggingface.co/onnx-community/dac_24khz-ONNX/resolve/main/onnx/encoder_model.onnx',
-];
-const DECODER_URLS = [
-  'https://huggingface.co/onnx-community/dac_24khz-ONNX/resolve/main/onnx/decoder_model_fp16.onnx',
-  'https://huggingface.co/onnx-community/dac_24khz-ONNX/resolve/main/onnx/decoder_model.onnx',
-];
 
 ort.env.wasm.wasmPaths  = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
 ort.env.wasm.numThreads = 1;
 ort.env.wasm.simd       = true;
+
+
+const MODEL_REVISION='4b180296388b0cebdca8191db999e87b03cd7a95';
+const WEIGHTS={
+ decoder:{url:'https://huggingface.co/onnx-community/dac_24khz-ONNX/resolve/4b180296388b0cebdca8191db999e87b03cd7a95/onnx/decoder_model_fp16.onnx',expectedBytes:105885847,sha256:'adf016cf402816d0639fe3cd791580f85e48980259a6f3e3c4993c5a2d661ff8',label:'decoder · FP16'},
+ encoder:{url:'https://huggingface.co/onnx-community/dac_24khz-ONNX/resolve/4b180296388b0cebdca8191db999e87b03cd7a95/onnx/encoder_model_fp16.onnx',expectedBytes:45648774,sha256:'7f985f37236fa5ef581285bd9644f372c06e74bd4767cfb524ee94558228343d',label:'encoder · FP16'}
+};
+const CACHE_NAME='realm-quant-fp16-v1',weightRows=document.getElementById('weight-rows'),phaseIds=['download','init','render','play'];
+const ACTIVE_WEIGHT_KEYS=document.getElementById('go-tone')?['encoder','decoder']:['decoder'];
+const transferBytes={encoder:0,decoder:0};
+function phase(n){const a=phaseIds.indexOf(n);phaseIds.forEach((p,i)=>{const e=document.getElementById('phase-'+p);e.dataset.state=i<a?'done':i===a?'active':'pending';});}
+function rowFor(k){let r=document.getElementById('weight-'+k);if(!r){r=document.createElement('div');r.className='weight-row';r.id='weight-'+k;r.innerHTML='<span></span><progress max="1" value="0"></progress><span class="muted">waiting</span>';weightRows.append(r);}return r;}
+ACTIVE_WEIGHT_KEYS.forEach(k=>rowFor(k));
+document.getElementById('weight-total').textContent='Total: 0.0 / '+(ACTIVE_WEIGHT_KEYS.reduce((n,k)=>n+WEIGHTS[k].expectedBytes,0)/1e6).toFixed(1)+' MB';
+function markExecuted(){document.getElementById('claim-executed').textContent='Execution: executed · inference completed';}
+function progressRow(k,got,total,cache){const r=rowFor(k),p=r.querySelector('progress'),m=r.lastElementChild;r.firstElementChild.textContent=WEIGHTS[k].label;if(total>0){p.value=Math.min(1,got/total);m.textContent=(100*p.value).toFixed(0)+'% · '+(got/1e6).toFixed(1)+'/'+(total/1e6).toFixed(1)+' MB'+(cache?' · cache '+cache:'');}else{p.removeAttribute('value');m.textContent=(got/1e6).toFixed(1)+' MB received · size unknown'+(cache?' · cache '+cache:'');}transferBytes[k]=got;const expected=ACTIVE_WEIGHT_KEYS.reduce((n,key)=>n+WEIGHTS[key].expectedBytes,0),received=ACTIVE_WEIGHT_KEYS.reduce((n,key)=>n+Math.min(transferBytes[key],WEIGHTS[key].expectedBytes),0);document.getElementById('weight-total').textContent='Total: '+(received/1e6).toFixed(1)+' / '+(expected/1e6).toFixed(1)+' MB';if(cache)document.getElementById('cache-state').textContent='Cache: '+cache;}
+async function sha256Hex(b){const d=await crypto.subtle.digest('SHA-256',b);return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,'0')).join('');}
+async function fetchPinned(k){const s=WEIGHTS[k],c=await caches.open(CACHE_NAME),hit=await c.match(s.url);let bytes,cacheLabel;if(hit){cacheLabel='HIT';bytes=new Uint8Array(await hit.arrayBuffer());progressRow(k,bytes.length,s.expectedBytes,cacheLabel);}else{cacheLabel='MISS';document.getElementById('cache-state').textContent='Cache: '+k+' MISS → populating';const r=await fetch(s.url);if(!r.ok)throw new Error('Pinned FP16 artifact unavailable: '+s.url+' ('+r.status+'). No FP32 fallback.');const total=Number(r.headers.get('Content-Length'))||0,rd=r.body.getReader(),chunks=[];let n=0;for(;;){const {done,value}=await rd.read();if(done)break;chunks.push(value);n+=value.byteLength;progressRow(k,n,total,cacheLabel);}bytes=new Uint8Array(n);let off=0;for(const x of chunks){bytes.set(x,off);off+=x.byteLength;}await c.put(s.url,new Response(bytes,{headers:{'Content-Type':'application/octet-stream'}}));}
+document.getElementById('claim-download').textContent='Downloadable: bytes received';const digest=await sha256Hex(bytes),state=digest===s.sha256?'verified':'mismatch';document.getElementById('hash-state').textContent='SHA-256: '+state;if(state==='mismatch'){await c.delete(s.url);throw new Error(s.label+' SHA-256 MISMATCH; cache purged; initialization blocked. Expected '+s.sha256+', got '+digest);}if(state==='verified'){document.getElementById('claim-verified').textContent='Artifact: verified';document.getElementById('hash-state').textContent='SHA-256 verified · Hugging Face LFS '+MODEL_REVISION.slice(0,7);if(bytes.length!==s.expectedBytes)throw new Error(s.label+' verified digest but unexpected byte count '+bytes.length+'; expected '+s.expectedBytes+'.');}else document.getElementById('hash-state').textContent='SHA-256 MISMATCH · no expected-digest match';document.getElementById('claim-verified').textContent='Artifact: mismatch · blocked';log(s.label+': '+state+' · '+bytes.length+' bytes · sha256 '+digest);progressRow(k,bytes.length,s.expectedBytes,cacheLabel);return bytes;}
+function updateRender(done,total,t0){const pct=total?Math.min(100,done/total*100):0;document.getElementById('render-fill').style.width=pct+'%';const elapsed=(performance.now()-t0)/1000,audio=done*HOP/SAMPLE_RATE,all=total*HOP/SAMPLE_RATE,rtf=audio?elapsed/audio:0,eta=audio?Math.max(0,(all-audio)*rtf):0;document.getElementById('render-meta').textContent='Rendered audio: '+audio.toFixed(2)+' / '+all.toFixed(2)+' s';document.getElementById('render-eta').textContent='Measured RTF '+(rtf?rtf.toFixed(2):'—')+' · ETA '+(audio?eta.toFixed(1)+' s':'—');const mem=performance.memory?.usedJSHeapSize;document.getElementById('memory-state').textContent=mem?'JS heap '+(mem/1e6).toFixed(0)+' MB · RSS unmeasured':'Resident memory: unmeasured';}
 
 /* ── elements ───────────────────────────────────────────────────────── */
 const ringEl    = document.getElementById('ring');
@@ -415,39 +429,7 @@ function setCharge(pct) {
   coreValue.textContent = Math.round(c) + '%';
 }
 
-/* ── model fetch ────────────────────────────────────────────────────── */
-async function fetchWithProgress(url, onProgress) {
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const total = Number(resp.headers.get('content-length')) || 0;
-  const reader = resp.body.getReader();
-  const chunks = [];
-  let received = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    received += value.length;
-    if (total) onProgress(received / total);
-  }
-  const bytes = new Uint8Array(received);
-  let off = 0;
-  for (const c of chunks) { bytes.set(c, off); off += c.length; }
-  return bytes;
-}
-async function fetchFirst(urls, name, onProgress) {
-  for (const url of urls) {
-    try {
-      log(`  ${name}: try ${url.split('/').pop()}`);
-      const bytes = await fetchWithProgress(url, onProgress);
-      log(`  ${name}: ${(bytes.byteLength / 1e6).toFixed(1)} MB`);
-      return bytes;
-    } catch (e) {
-      log(`  ${name}: miss (${e.message})`);
-    }
-  }
-  throw new Error(`no ${name} URL succeeded`);
-}
+async function fetchFirst(key){return fetchPinned(key);}
 
 /* ── input sources ──────────────────────────────────────────────────── */
 function makeArpeggio(seconds = INPUT_SEC, sampleRate = SAMPLE_RATE) {
@@ -514,7 +496,7 @@ async function runEncoder(sess, inputF32) {
 }
 
 /* ── decoder: codes → PCM (chunked, seam-trimmed) ───────────────────── */
-async function decodeChunked(sess, codes, totalFrames, chunkFrames) {
+async function decodeChunked(sess,codes,totalFrames,chunkFrames,onChunk=()=>{}) {
   const nChunks = Math.ceil(totalFrames / chunkFrames);
   const pieces = [];
   for (let c = 0; c < nChunks; c++) {
@@ -536,7 +518,7 @@ async function decodeChunked(sess, codes, totalFrames, chunkFrames) {
     const input = new ort.Tensor('int64', padded, [1, 32, frames + 1]);
     const out   = await sess.run({ audio_codes: input });
     const data  = out[Object.keys(out)[0]].data;
-    pieces.push(data.slice(0, frames * HOP));   // drop context frame + 8-sample seam
+    pieces.push(data.slice(0, frames * HOP)); onChunk(c+1,nChunks);   // drop context frame + 8-sample seam
   }
 
   const total  = pieces.reduce((a, p) => a + p.length, 0);
@@ -576,15 +558,15 @@ async function run(inputSource) {
 
   try {
     /* 0 · FETCH (+) — both fp16 models in parallel */
-    setStage(0, 'fetching fp16 encoder + decoder…');
+    phase('download'); setStage(0, '① Download · pinned FP16 encoder + decoder');
     const [encBytes, decBytes] = await Promise.all([
-      fetchFirst(ENCODER_URLS, 'encoder', f => setCharge( f        * 18)),
-      fetchFirst(DECODER_URLS, 'decoder', f => setCharge((f + 1)   * 18)),
+      fetchFirst('encoder'),
+      fetchFirst('decoder'),
     ]);
     setCharge(36);
 
     /* 1 · LOAD (−) — both sessions */
-    setStage(1, 'creating encoder + decoder sessions…');
+    phase('init'); setStage(1, '② Init · ONNX Runtime WASM sessions');
     const tLoad = performance.now();
     const [encSess, decSess] = await Promise.all([
       ort.InferenceSession.create(encBytes, {
@@ -598,7 +580,7 @@ async function run(inputSource) {
     setCharge(52);
 
     /* 2 · ENCODE (+) — input audio → codes */
-    setStage(2, inputSource === 'mic' ? 'recording microphone (1.0 s)…' : 'building test tone…');
+    phase('render'); setStage(2, inputSource === 'mic' ? 'recording microphone (1.0 s)…' : 'building test tone…');
     let inputF32;
     if (inputSource === 'mic') {
       inputF32 = await recordMic(INPUT_SEC, SAMPLE_RATE);
@@ -617,17 +599,18 @@ async function run(inputSource) {
     setCharge(68);
 
     /* 3 · DECODE (−) — codes → PCM */
-    setStage(3, `decoding ${frames} code frames (chunked)…`);
+    setStage(3, `③ Render · offline — not realtime · ${frames} code frames`);
     const tDec = performance.now();
-    const pcm = await decodeChunked(decSess, codes, frames, CHUNK_FRAMES);
+    const renderStart=performance.now(); const pcm=await decodeChunked(decSess,codes,frames,CHUNK_FRAMES,(d,t)=>updateRender(d,t,renderStart));
+    markExecuted();
     const decMs = performance.now() - tDec;
     const outSec = pcm.length / SAMPLE_RATE;
     log(`decode: ${pcm.length} samples in ${decMs.toFixed(0)} ms · RTF ${(decMs/1000/outSec).toFixed(2)}`);
-    log(`round-trip: ${inSec.toFixed(3)} s in → ${outSec.toFixed(3)} s out`);
+    log(`round-trip: ${inSec.toFixed(3)} s in → ${outSec.toFixed(3)} s out · combined RTF ${((encMs+decMs)/1000/outSec).toFixed(2)}`);
     setCharge(86);
 
     /* 4 · PLAY (+) */
-    setStage(4, 'playing reconstructed PCM…');
+    phase('play'); setStage(4, '④ Playback · offline render result');
     await playPCM(pcm, SAMPLE_RATE);
     log('playback end');
     setCharge(95);
