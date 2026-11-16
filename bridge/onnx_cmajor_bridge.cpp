@@ -124,15 +124,18 @@ extern "C" int64_t rq_ort_run_f32(int64_t handle, const float* input,
                 std::copy_n(static_cast<const float*>(raw), count, output); break;
             case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32: {
                 auto p = static_cast<const int32_t*>(raw);
-                for (size_t i=0;i<count;++i) output[i]=static_cast<float>(p[i]); break;
+                for (size_t i = 0; i < count; ++i) { output[i] = static_cast<float>(p[i]); }
+                break;
             }
             case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64: {
                 auto p = static_cast<const int64_t*>(raw);
-                for (size_t i=0;i<count;++i) output[i]=static_cast<float>(p[i]); break;
+                for (size_t i = 0; i < count; ++i) { output[i] = static_cast<float>(p[i]); }
+                break;
             }
             case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16: {
                 auto p = static_cast<const Ort::Float16_t*>(raw);
-                for (size_t i=0;i<count;++i) output[i]=static_cast<float>(p[i]); break;
+                for (size_t i = 0; i < count; ++i) { output[i] = static_cast<float>(p[i]); }
+                break;
             }
             default: throw std::runtime_error("unsupported output element type");
         }
