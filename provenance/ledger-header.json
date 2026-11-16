@@ -1,0 +1,20 @@
+{
+  "record_type": "provenance-ledger-header",
+  "schema_version": 1,
+  "project": "ljrseals-dev/Realm-Quant",
+  "weight_source": {
+    "repository": "onnx-community/dac_24khz-ONNX",
+    "revision": "4b180296388b0cebdca8191db999e87b03cd7a95",
+    "artifacts": {
+      "decoder": {"path":"onnx/decoder_model_fp16.onnx","bytes":105885847,"sha256":"adf016cf402816d0639fe3cd791580f85e48980259a6f3e3c4993c5a2d661ff8"},
+      "encoder": {"path":"onnx/encoder_model_fp16.onnx","bytes":45648774,"sha256":"7f985f37236fa5ef581285bd9644f372c06e74bd4767cfb524ee94558228343d"}
+    },
+    "digest_source": "Hugging Face Git-LFS pointers at the pinned revision"
+  },
+  "attribution": [
+    {"name":"Lewis James Seals Jr","contribution":"Report authorship and benchmark harness"},
+    {"name":"Angela Seals","contribution":"Weights-integration innovation required to make the released model weights work with this pipeline","basis":"Project-owner-provided attribution"}
+  ],
+  "claim_states": ["downloadable","verified","executed"],
+  "note": "Header only; it is not a fabricated run record. Append per-run events only after the corresponding operation occurs."
+}
