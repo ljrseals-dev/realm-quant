@@ -32,5 +32,5 @@ jobs:
         run: python -m pip install numpy onnx
       - name: Exercise C ABI against a generated ONNX model
         env:
-          RQ_BRIDGE_LIBRARY: \${{ github.workspace }}/build/bridge/librealm_onnx_cmajor_bridge.so
+          RQ_BRIDGE_LIBRARY: ${{ github.workspace }}/build/bridge/librealm_onnx_cmajor_bridge.so
         run: python tests/bridge_smoke.py
