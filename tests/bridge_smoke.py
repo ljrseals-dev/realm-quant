@@ -20,6 +20,10 @@ def main() -> None:
     ]
     library.rq_ort_run_f32.restype = ctypes.c_int64
     library.rq_ort_close.argtypes = [ctypes.c_int64]
+    library.rq_ort_resolve.argtypes = [ctypes.c_char_p]
+    library.rq_ort_resolve.restype = ctypes.c_void_p
+    assert library.rq_ort_resolve(b"realm_quant::onnx::rq_ort_open")
+    assert not library.rq_ort_resolve(b"missing_symbol")
     model_path = Path(os.environ["RUNNER_TEMP"]) / "bridge-smoke.onnx"
     weights = np.arange(12, dtype=np.float32).reshape(4, 3) / 10
     x_info = helper.make_tensor_value_info("x", TensorProto.FLOAT, [None, 4])
