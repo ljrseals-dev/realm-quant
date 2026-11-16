@@ -1,8 +1,10 @@
 """Native C ABI smoke test using a generated one-input/one-output ONNX graph."""
 from __future__ import annotations
+
 import ctypes
 import os
 from pathlib import Path
+
 import numpy as np
 import onnx
 from onnx import TensorProto, helper, numpy_helper
