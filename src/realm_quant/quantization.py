@@ -56,7 +56,7 @@ def _ternarize(
     if axis < 0:
         axis += weights.ndim
     if not 0 <= axis < weights.ndim:
-        raise ValueError(f\"scale axis {axis} is invalid for rank {weights.ndim}\")
+        raise ValueError(f"scale axis {axis} is invalid for rank {weights.ndim}")
     moved = np.moveaxis(weights, axis, 0)
     rows = moved.reshape(moved.shape[0], -1)
     magnitudes = np.abs(rows)
