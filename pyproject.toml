@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "realm-quant"
+version = "0.1.0"
+description = "Python-first quantization and neural audio codec workbench"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = [
+  "numpy>=1.24",
+  "onnx>=1.15",
+  "onnxruntime>=1.17",
+  "soundfile>=0.12",
+]
+
+[project.optional-dependencies]
+fp16 = ["onnxconverter-common>=1.14"]
+int8 = ["onnxruntime>=1.17"]
+resample = ["scipy>=1.10"]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+realm-quant = "realm_quant.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

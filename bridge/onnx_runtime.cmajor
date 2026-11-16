@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: MIT
+// Native LLVM-backend declarations. Not a browser/WASM adapter.
+namespace realm_quant::onnx
+{
+    external int64 rq_ort_open (int8[] model_path, int32 intra_op_threads);
+    external int64 rq_ort_run_f32 (int64 handle,
+        float[] input, int64[] input_dims, int32 input_rank,
+        float[] output, int64 output_capacity,
+        int64[] output_dims, int32 max_output_rank, int32[] output_rank);
+    external int32 rq_ort_last_error (int8[] destination, int32 capacity);
+    external void rq_ort_close (int64 handle);
+}

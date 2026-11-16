@@ -1,0 +1,36 @@
+name: Native ONNX Cmajor bridge CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native-bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ONNX Runtime SDK
+        run: |
+          curl -L --fail --retry 3 \
+            https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/onnxruntime-linux-x64-1.22.0.tgz \
+            -o "$RUNNER_TEMP/onnxruntime.tgz"
+          tar -xzf "$RUNNER_TEMP/onnxruntime.tgz" -C "$RUNNER_TEMP"
+          echo "ONNXRUNTIME_ROOT=$RUNNER_TEMP/onnxruntime-linux-x64-1.22.0" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$RUNNER_TEMP/onnxruntime-linux-x64-1.22.0/lib:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
+      - name: Build native bridge
+        run: |
+          cmake -S bridge -B build/bridge -DONNXRUNTIME_ROOT="$ONNXRUNTIME_ROOT" -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/bridge --parallel 2
+      - name: Install smoke-test dependencies
+        run: python -m pip install numpy onnx
+      - name: Exercise C ABI against a generated ONNX model
+        env:
+          RQ_BRIDGE_LIBRARY: ${{ github.workspace }}/build/bridge/librealm_onnx_cmajor_bridge.so
+        run: python tests/bridge_smoke.py
