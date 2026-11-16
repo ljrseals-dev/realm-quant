@@ -9,6 +9,7 @@ import numpy as np
 import onnx
 from onnx import TensorProto, helper, numpy_helper
 
+
 def main() -> None:
     library = ctypes.CDLL(os.environ["RQ_BRIDGE_LIBRARY"])
     library.rq_ort_open.argtypes = [ctypes.c_char_p, ctypes.c_int32]
