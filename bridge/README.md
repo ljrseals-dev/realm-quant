@@ -29,9 +29,11 @@ Install the ONNX Runtime C/C++ SDK (headers and library), then run:
     cmake -S bridge -B build/bridge -DONNXRUNTIME_ROOT=/path/to/onnxruntime
     cmake --build build/bridge --config Release
 
-Make the resulting shared library visible to the native host. Link the Cmajor
-LLVM engine with its exported C ABI symbols and load
-bridge/onnx_runtime.cmajor into the Cmajor program.
+Make the resulting shared library visible to the native host. The host must
+implement the Cmajor Engine::link symbol-resolver callback and return the
+function pointers for rq_ort_open, rq_ort_run_f32, rq_ort_last_error, and
+rq_ort_close. Merely loading the shared library does not register these
+symbols automatically. Load bridge/onnx_runtime.cmajor into the Cmajor program.
 
 ## Lifecycle
 
