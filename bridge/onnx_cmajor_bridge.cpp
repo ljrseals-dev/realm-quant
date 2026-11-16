@@ -170,3 +170,18 @@ extern "C" void rq_ort_close(int64_t handle) {
     std::lock_guard<std::mutex> lock(models_mutex);
     models.erase(handle);
 }
+
+extern "C" void* rq_ort_resolve(const char* symbol) {
+    if (!symbol) return nullptr;
+    const char* name = std::strrchr(symbol, ':');
+    name = name ? name + 1 : symbol;
+    if (std::strcmp(name, "rq_ort_open") == 0)
+        return reinterpret_cast<void*>(&rq_ort_open);
+    if (std::strcmp(name, "rq_ort_run_f32") == 0)
+        return reinterpret_cast<void*>(&rq_ort_run_f32);
+    if (std::strcmp(name, "rq_ort_last_error") == 0)
+        return reinterpret_cast<void*>(&rq_ort_last_error);
+    if (std::strcmp(name, "rq_ort_close") == 0)
+        return reinterpret_cast<void*>(&rq_ort_close);
+    return nullptr;
+}
