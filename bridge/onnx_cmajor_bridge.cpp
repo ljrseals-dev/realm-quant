@@ -3,6 +3,7 @@
 #include "onnx_cmajor_bridge.h"
 #include <onnxruntime_cxx_api.h>
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <memory>
@@ -74,8 +75,9 @@ extern "C" int64_t rq_ort_run_f32(int64_t handle, const float* input,
     int64_t output_capacity, int64_t* output_dims, int32_t max_output_rank,
     int32_t* output_rank) {
     try {
-        if (!input || !output || !output_dims || !output_rank || output_capacity < 0)
-            throw std::runtime_error("null buffer or invalid output capacity");
+        if (!input || !output || !output_dims || !output_rank ||
+            output_capacity < 0 || max_output_rank < 0 || max_output_rank > 16)
+            throw std::runtime_error("null buffer or invalid output capacity/rank");
         const size_t n = checked_count(input_dims, input_rank);
         std::lock_guard<std::mutex> lock(models_mutex);
         auto it = models.find(handle);
@@ -89,10 +91,23 @@ extern "C" int64_t rq_ort_run_f32(int64_t handle, const float* input,
         void* data = f32.data();
         size_t element_bytes = sizeof(float);
         if (m.input_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32) {
-            i32.reserve(n); for (float x : f32) i32.push_back(static_cast<int32_t>(x));
+            i32.reserve(n);
+            for (float x : f32) {
+                if (!std::isfinite(x) || static_cast<double>(x) < std::numeric_limits<int32_t>::min() ||
+                    static_cast<double>(x) >= static_cast<double>(std::numeric_limits<int32_t>::max()) + 1.0)
+                    throw std::runtime_error("input value is outside int32 range");
+                i32.push_back(static_cast<int32_t>(x));
+            }
             data = i32.data(); element_bytes = sizeof(int32_t);
         } else if (m.input_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64) {
-            i64.reserve(n); for (float x : f32) i64.push_back(static_cast<int64_t>(x));
+            i64.reserve(n);
+            const double int64_limit = std::ldexp(1.0, 63);
+            for (float x : f32) {
+                if (!std::isfinite(x) || static_cast<double>(x) < -int64_limit ||
+                    static_cast<double>(x) >= int64_limit)
+                    throw std::runtime_error("input value is outside int64 range");
+                i64.push_back(static_cast<int64_t>(x));
+            }
             data = i64.data(); element_bytes = sizeof(int64_t);
         } else if (m.input_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16) {
             f16.reserve(n); for (float x : f32) f16.emplace_back(x);
